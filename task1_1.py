@@ -1,7 +1,6 @@
 s = input("Enter numbers in range (1,N): ")
 numbers = list(map(int, s.split()))
 N=max(numbers)
-print(N)
 count=0
 mask=[0]*N
 for i in numbers:
