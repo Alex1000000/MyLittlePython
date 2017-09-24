@@ -5,8 +5,6 @@ count=0
 mask=[0]*N
 for i in numbers:
     mask[numbers[count] - 1] += 1
-    count += 1
-count=0
 for i in mask:
     if (i>0):
         count+=1
