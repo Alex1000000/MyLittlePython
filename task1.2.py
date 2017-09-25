@@ -102,7 +102,7 @@ def isIntersection(A, B, C, A2, B2, C2):
     else:
         return False
 
-#true
+#false
 A=[0,0,0]
 B=[0,0,5]
 C=[5,0,5]
