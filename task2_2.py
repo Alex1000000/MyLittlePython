@@ -29,7 +29,6 @@ def longestIncreasingSubsequence(X):
     return Length
 
 
-
-A=[0, 1,2,3,5,0,1,2,3]
+A=[0, 1,2,3,4,5,0,1,2,3]
 print( longestIncreasingSubsequence(A))
 
