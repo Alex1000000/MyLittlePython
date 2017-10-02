@@ -20,9 +20,16 @@ def longestIncreasingSubsequence(X):
 
         if (newL > Length):
             Length = newL
+    SubS = []
+    k = M[Length]
+    for i in range(Length - 1, -1, -1):
+        SubS.append(X[k])
+        k = Prev[k]
+    print(SubS)
     return Length
 
 
-A=[0, 1,2,4,5,0,1,2,3]
+
+A=[0, 1,2,3,5,0,1,2,3]
 print( longestIncreasingSubsequence(A))
 
