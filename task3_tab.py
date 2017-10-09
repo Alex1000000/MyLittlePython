@@ -116,7 +116,7 @@ win.title("Python GUI")                 # Add a title
 tabControl = ttk.Notebook(win)          # Create Tab Control
 tab1 = ttk.Frame(tabControl, width= 70,height = 70)            # Create a tab
 tabControl.add(tab1, text='Edit')      # Add the tab
-tabControl.pack(expand=1, fill="both")  # Pack to make visible
+tabControl.pack(expand=1, fill="both",side=tk.LEFT)  # Pack to make visible
 
 mouse_label = tk.Label(tab1, text="Mouse coordinates:")
 mouse_label.pack()
@@ -194,9 +194,9 @@ button = tk.Button(master=win, text='Quit', bg="blue",fg="white" ,command=_quit)
 button.pack(side=tk.BOTTOM)
 selectColor=tk.Button(tab2,text="selectColor", command=getColor)
 selectColor.pack()
-saveFile=tk.Button(tab2,text="saveFile", command=file_save)
+saveFile=tk.Button(tab1,text="saveFile", command=file_save)
 saveFile.pack()
-openFile=tk.Button(tab2,text="openFile", command=file_open)
+openFile=tk.Button(tab1,text="openFile", command=file_open)
 openFile.pack()
 
 
