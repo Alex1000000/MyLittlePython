@@ -214,7 +214,7 @@ q1 = [1, 1, 2]
 q2 = [5, 6, -2]
 q3 = [3, -4, -1]
 tr2 = [q1, q2, q3]
-all_Coordinates.append([tr2,tr1])
+all_Coordinates.append([tr1,tr2])
 
 
 
@@ -233,7 +233,7 @@ for i in range(0,len(all_Coordinates)):
     ax.set_ylim(-5, 5)
     ax.set_zlim(-5, 5)
     print(i)
-    print(isIntersection(np.asarray(all_Coordinates[i][0]), np.asarray(all_Coordinates[i][1])))
+    print(isIntersection(np.asarray(all_Coordinates[i][0]), np.asarray(all_Coordinates[i][1])) or isIntersection(np.asarray(all_Coordinates[i][1]), np.asarray(all_Coordinates[i][0])))
     pl.show()
     inputInt = int()
     # input()
