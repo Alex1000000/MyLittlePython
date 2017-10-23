@@ -16,6 +16,10 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 
+
+import scipy as sp
+from scipy.integrate.odepack import odeint
+
 def _quit():
     win.quit()     # stops mainloop
     win.destroy()  # this is necessary on Windows to prevent
@@ -58,10 +62,10 @@ def getColorFromCombo(event):
 
 def onMouseClick(event):
     s=e.get()
-    print(s)
-    print(x_mouse,";  ",y_mouse)
+    # print(x_mouse,";  ",y_mouse)
+    # print(s)
     if s!="None;  None":
-        print("mose CLICK LEFT")
+        # print("mose CLICK LEFT")
         if currentColorFromCombo==0:
             circle1 = plt.Circle((x_mouse, y_mouse), scaleMy.get(), color='r')
         elif currentColorFromCombo==1:
@@ -108,6 +112,251 @@ def file_open():
     txt=file.read()
     print(txt)
     print("file open")
+
+
+
+
+
+def f_vect_scipy(z,t):
+    # z is a vector with 12 entries
+    # ordered in blocks of 4:
+    # x[k](t),x’[k](t),y[k](t),y’[k](t)
+    # for k = 1,2,3.
+    L = [0 for k in range(12)]
+    r = sp.array(L, float)
+
+    # take three equal masses
+    m = [597200000, 7.36, 597.2]
+    # relabel input vector z
+    x1 = z[0];
+    u1 = z[1];
+    y1 = z[2];
+    v1 = z[3]
+    x2 = z[4];
+    u2 = z[5];
+    y2 = z[6];
+    v2 = z[7]
+    x3 = z[8];
+    u3 = z[9];
+    y3 = z[10];
+    v3 = z[11]
+    # u and v are first derivatives of x and y
+    r[0] = u1;
+    r[2] = v1
+    r[4] = u2;
+    r[6] = v2
+    r[8] = u3;
+    r[10] = v3
+
+    r1 = np.array([x1, y1])
+    r2 = np.array([x2, y2])
+    r3 = np.array([x3, y3])
+
+    vel1 = np.array([u1, v1])
+    vel2 = np.array([u2, v2])
+    vel3 = np.array([u3, v3])
+
+    dist12 = np.linalg.norm(r1 - r2)
+    dist13 = np.linalg.norm(r1 - r3)
+    dist32 = np.linalg.norm(r3 - r2)
+
+    G = 10
+    a1 = G * (m[1] * (r2 - r1) / (dist12 ** 3) + m[2] * (r3 - r1) / (dist13 ** 3))
+    a2 = G * (m[0] * (r1 - r2) / (dist12 ** 3) + m[2] * (r3 - r2) / (dist32 ** 3))
+    a3 = G * (m[0] * (r1 - r3) / (dist13 ** 3) + m[1] * (r2 - r3) / (dist32 ** 3))
+
+    r[1] = a1[0]
+    r[3] = a1[1]
+    r[5] = a2[0]
+    r[7] = a2[1]
+    r[9] = a3[0]
+    r[11] = a3[1]
+    return r
+
+def verlet(z,t,N_of_iterations):
+    # z is a vector with 12 entries
+    # ordered in blocks of 4:
+    # x[k](t),x’[k](t),y[k](t),y’[k](t)
+    # for k = 1,2,3.
+    L = [0 for k in range(12)]
+    r = sp.array(L,float)
+
+    # take three equal masses
+    #sun 1.98892 × 10^30   217000
+    #moon 7.36 × 10^22     1020
+    #earth 5.972 x 10^24   30000 м/с
+    m = [597200000, 7.36, 597.2]
+    # relabel input vector z
+    x1 = z[0]; u1 = z[1]; y1 = z[2]; v1 = z[3]
+    x2 = z[4]; u2 = z[5]; y2 = z[6]; v2 = z[7]
+    x3 = z[8]; u3 = z[9]; y3 = z[10]; v3 = z[11]
+    # u and v are first derivatives of x and y
+    r[0] = u1; r[2] = v1
+    r[4] = u2; r[6] = v2
+    r[8] = u3; r[10] = v3
+
+    r1=np.array([x1,y1])
+    r2=np.array([x2,y2])
+    r3=np.array([x3,y3])
+
+    vel1=np.array([u1,v1])
+    vel2=np.array([u2,v2])
+    vel3=np.array([u3,v3])
+
+    dist12 = np.linalg.norm(r1 - r2)
+    dist13 = np.linalg.norm(r1 - r3)
+    dist32 = np.linalg.norm(r3 - r2)
+
+    G = 10
+    a1 = G * (m[1] * (r2 - r1) / (dist12 ** 3) + m[2] * (r3 - r1) / (dist13 ** 3))/m[0]
+    a2 = G * (m[0] * (r1 - r2) / (dist12 ** 3) + m[2] * (r3 - r2) / (dist32 ** 3))/m[1]
+    a3 = G * (m[0] * (r1 - r3) / (dist13 ** 3) + m[1] * (r2 - r3) / (dist32 ** 3))/m[2]
+
+    # N_of_iterations=10
+
+    x1_n = np.zeros(N_of_iterations)
+    y1_n = np.zeros(N_of_iterations)
+
+    x2_n = np.zeros(N_of_iterations)
+    y2_n = np.zeros(N_of_iterations)
+
+    x3_n = np.zeros(N_of_iterations)
+    y3_n = np.zeros(N_of_iterations)
+
+    delta_t=0.1
+
+    for i in range(0,N_of_iterations-1):
+        delta_t=t[i]
+
+        r1_next = r1 + vel1 * delta_t + 0.5 * a1*delta_t*delta_t
+        r2_next = r2 + vel2 * delta_t + 0.5 * a2*delta_t*delta_t
+        r3_next = r3 + vel3 * delta_t + 0.5 * a3*delta_t*delta_t
+        x1_n[i + 1]=r1_next[0]
+        y1_n[i + 1]=r1_next[1]
+
+        x2_n[i + 1]=r2_next[0]
+        y2_n[i + 1]=r2_next[1]
+
+        x3_n[i + 1]=r3_next[0]
+        y3_n[i + 1]=r3_next[1]
+
+        dist12 = np.linalg.norm(r1 - r2)
+        dist13 = np.linalg.norm(r1 - r3)
+        dist32 = np.linalg.norm(r3 - r2)
+
+        a1_next = G * (m[1] * (r2 - r1) / (dist12 ** 3) + m[2] * (r3 - r1) / (dist13 ** 3))/m[0]
+        a2_next = G * (m[0] * (r1 - r2) / (dist12 ** 3) + m[2] * (r3 - r2) / (dist32 ** 3))/m[1]
+        a3_next = G * (m[0] * (r1 - r3) / (dist13 ** 3) + m[1] * (r2 - r3) / (dist32 ** 3))/m[2]
+
+        vel1_next = vel1 + 0.5 * delta_t * (a1_next + a1)
+        vel2_next = vel2 + 0.5 * delta_t * (a2_next + a2)
+        vel3_next = vel3 + 0.5 * delta_t * (a3_next + a3)
+
+        r1 = r1_next
+        r2 = r2_next
+        r3 = r3_next
+
+        vel1=vel1_next
+        vel2=vel2_next
+        vel3=vel3_next
+
+        a1=a1_next
+        a2=a2_next
+        a3=a3_next
+    # plotting the trajectories
+
+    # fig = plt.figure()
+    # a = fig.add_subplot(111)
+    xMax = max(max(x1_n), max(x2_n), max(x3_n))
+    xMim = min(min(x1_n), min(x2_n), min(x3_n))
+    yMax = max(max(y1_n), max(y2_n), max(y3_n))
+    yMim = min(min(y1_n), min(y2_n), min(y3_n))
+    a.set_xlim([xMim - 100, xMax + 100])
+    a.set_ylim([yMim - 100, yMax + 100])
+    canvas.draw()
+    a.plot(x1_n, y1_n,"r", x2_n, y2_n,"g", x3_n, y3_n,"b")
+    plt.show()
+    return r
+
+
+
+def scipy_n_body():
+    # Plots the trajectories of 3 equal masses
+    # forming a figure 8.
+
+    # initial positions
+    ip1 = [0, 0]  #the sun
+    ip2 = [0, -1499.80000]  #the moon
+    ip3 = [0, -1496.00000]  #the earth 380.000  150.000.000
+    # initial velocities
+    iv1=[1.0,1.0]#217000
+    iv3 = [72.0, 72.0]#1020
+    iv2 = [0, 300.00]#30000
+    # input for initial righthandside vector
+    initz = [ip1[0], iv1[0], ip1[1], iv1[1], \
+    ip2[0], iv2[0], ip2[1], iv2[1], \
+    ip3[0], iv3[0], ip3[1], iv3[1]]
+    T = 5#2 * sp.pi / 3;
+    n = 1000
+    tspan = sp.linspace(0, T, n + 1)
+    z_trajectories = odeint(f_vect_scipy, initz, tspan,mxstep=5000)
+    # extracting the trajectories
+    x1_traj = z_trajectories[:, 0];
+    y1_traj = z_trajectories[:, 2];
+    x2_traj = z_trajectories[:, 4];
+    y2_traj = z_trajectories[:, 6];
+    x3_traj = z_trajectories[:, 8];
+    y3_traj = z_trajectories[:, 10];
+    # # plotting the trajectories
+    # fig = plt.figure("scipy: The Sun The Moon The Earth")
+    # plt.plot(x1, y1,"r", x2, y2,"g", x3, y3,"b")
+    # plt.show()
+    # fig = plt.figure()
+    # a = fig.add_subplot(111)
+    xMax = max(max(x1_traj), max(x2_traj), max(x3_traj))
+    xMim = min(min(x1_traj), min(x2_traj), min(x3_traj))
+    yMax = max(max(y1_traj), max(y2_traj), max(y3_traj))
+    yMim = min(min(y1_traj), min(y2_traj), min(y3_traj))
+    a.set_xlim([xMim-100,xMax+100])
+    a.set_ylim([yMim - 100, yMax + 100])
+    canvas.draw()
+    a.plot(x1_traj, y1_traj,"r", x2_traj, y2_traj,"g", x3_traj, y3_traj,"b")
+    print(x1_traj)
+    plt.show()
+
+
+def verlet_nBody():
+    # Plots the trajectories of 3 equal masses
+    # forming a figure 8.
+
+    # initial positions
+    ip1 = [0, 0]  #the sun
+    ip2 = [0, -1499.80000]  #the moon
+    ip3 = [0, -1496.00000]  #the earth 380.000  150.000.000
+    # initial velocities
+    iv1=[1.0,1.0]#217000
+    iv3 = [72.0, 72.0]#1020
+    iv2 = [0, 300.00]#30000
+    # input for initial righthandside vector
+    initz = [ip1[0], iv1[0], ip1[1], iv1[1], \
+    ip2[0], iv2[0], ip2[1], iv2[1], \
+    ip3[0], iv3[0], ip3[1], iv3[1]]
+    T = 5#2 * sp.pi / 3;
+    n = 1000
+    tspan = sp.linspace(0, T, n + 1)
+    z_trajectories = verlet(initz, tspan,n)
+
+def n_body_solving():
+    print(v.get())
+    modeOfComputation=v.get()
+    if (modeOfComputation=="1"):
+        print("_scipy")
+        scipy_n_body()
+    elif (modeOfComputation=="2"):
+        print("_scipy")
+        verlet_nBody()
+
+
 
 x_mouse=0.0
 y_mouse=0.0
@@ -198,7 +447,25 @@ saveFile=tk.Button(tab1,text="saveFile", command=file_save)
 saveFile.pack()
 openFile=tk.Button(tab1,text="openFile", command=file_open)
 openFile.pack()
+# nBody=tk.Button(tab1,text="openFile", command=file_open)
+# nBody.pack()
 
+
+MODES = [
+        ("scipy", "1"),
+        ("verlet", "2"),
+        ("verlet-threading", "3"),
+        ("verlet-multiprocessing", "4"),
+        ("verlet-cython", "5"),
+        ("verlet-opencl", "6")
+    ]
+
+v = tk.StringVar()
+v.set("1") # initialize
+
+for text, mode in MODES:
+    b = tk.Radiobutton(tab2, text=text,variable=v, value=mode, command=n_body_solving)
+    b.pack(anchor=tk.W)
 
 #ax = plt.axes()
 #ax.transData.transform_point([x, y])
