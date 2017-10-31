@@ -173,7 +173,7 @@ jacobianA = A.jacobian(var_vector)
 # print jacobianA
 detA = jacobianA.det()
 traceA = jacobianA.trace()
-# print detA
+print detA
 y_range = np.linspace(0, 1, 1000)
 # x_range = np.linspace(0, 1, 10000)
 # x_y_range = np.linspace(0, 1, 100)
@@ -196,44 +196,101 @@ print "k3_value=",k3_value
 k2_points=one_p_analysis(alpha_value,k3_value)
 # print "k2_points=", k2_points
 # #########################################################
-print eq1
-print eq2
-print "detA=", detA.subs(x, x_fromSystem)
-print "x_fromSystem=",x_fromSystem
+
 eqprek2 = solve(detA.subs(x, x_fromSystem), k2)
-print "eqprek2=", eqprek2
-
-# eqprek2 = solve(detA.subs(x, x_fromSystem), k2)
+eqprek2_tr = solve(traceA.subs(x, x_fromSystem), k2)
 eqprek1 = eqprek2[0] - eqk2
-print "eqprek1=", eqprek1
+eqprek1_tr = eqprek2_tr[0] - eqk2
 eqk1 = solve(eqprek1.subs(k30, k3_value ).subs(k_1, k_1_value).subs(k_2, k_2_value).subs(alpha,alpha_value), k1)
-print "eqk1=",eqk1
-#
+eqk1_tr = solve(eqprek1_tr.subs(k30, k3_value ).subs(k_1, k_1_value).subs(k_2, k_2_value).subs(alpha,alpha_value), k1)
 fk2_yk1_det = lambdify((y, k1), eqprek2[0].subs(k30, k3_value).subs(k_1, k_1_value).subs(k_2, k_2_value).subs(alpha,alpha_value), 'numpy')
-
-print "fk2_yk1_det=",eqprek2[0].subs(k30, k3_value).subs(k_1, k_1_value).subs(k_2, k_2_value).subs(alpha,alpha_value)
-fk1_y_det1 = lambdify(y, eqk1[0], 'numpy')
-fk1_y_det2 = lambdify(y, eqk1[1], 'numpy')
-print "K1(K2)=",fk2_yk1_det(y_range, 0.03809116)
-plt.plot(fk2_yk1_det(y_range, fk1_y_det1(y_range)), fk1_y_det1(y_range),label="neutrality line")
+fk1_y_tr1 = lambdify(y, eqk1_tr[0], 'numpy')
+fk1_y_det2 = lambdify(y, eqk1[0], 'numpy')
+plt.plot(fk2_yk1_det(y_range, fk1_y_tr1(y_range)), fk1_y_tr1(y_range),label="neutrality line")
 plt.plot(fk2_yk1_det(y_range, fk1_y_det2(y_range)), fk1_y_det2(y_range), label="multiplicity line")
-plt.title('Two-parameter analysis ($k_1(k_2)$)')
-plt.xlabel('$k_2$')
-plt.ylabel('$k_1$')
-plt.legend()
 plt.grid(True)
 axes = plt.gca()
-axes.set_xlim([0, 40])
-axes.set_ylim([0, 40])
+axes.set_xlim([0, 2])
+axes.set_ylim([0, 2])
 plt.show()
+print "K1(K2)=",fk2_yk1_det(y_range, 0.03809116)
+#
+# solution = solve([eq1, eq2], x, k2)
+# xSolution = solution[0][0]
+# k2Solution = solution[0][1]
+#
+# A = Matrix([eq1, eq2])
+# var_vector = Matrix([x, y])
+# jacA = A.jacobian(var_vector)
+# detA = jacA.det()
+# traceA = jacA.trace()
+# discriminantA = traceA**2-4*detA
+solution = solve([eq1, eq2], x, k2)
+xSolution = solution[0][0]
+print "xSolution=",xSolution
+k2Solution = solution[0][1]
+print "DetA=",detA
+print "k2Solution=",k2Solution
+
+k2TraceSol = solve(traceA.subs(x,xSolution),k2)[0]
+k1JointTraceSol = solve(k2TraceSol - k2Solution,k1)[0]
+k2JointTraceSol = k2Solution.subs(k1,k1JointTraceSol)
+k1Trace_y = lambdify((y,k_1,k_2,k30,alpha),k1JointTraceSol,'numpy')
+k2Trace_y = lambdify((y,k_1,k_2,k30,alpha),k2JointTraceSol,'numpy')
+plt.plot(k2Trace_y(y_range, k_1_value,k_2_value,k3_value,alpha_value), k1Trace_y(y_range, k_1_value,k_2_value,k3_value,alpha_value),color='b', linewidth=1.5, label='neutrality line')
+# plt.plot(k2Trace_y(y_range, k_1_value,k_2_value,k3_value,alpha_value), k1Trace_y(y_range, k_1_value,k_2_value,k3_value,alpha_value),linestyle='--', linewidth=1.5, label='neutral')
+
+k2DetSol = solve(detA.subs(x,xSolution),k2)[0]
+k1JointDetSol = solve(k2DetSol - k2Solution,k1)[0]
+k2JointDetSol = k2Solution.subs(k1,k1JointDetSol)
+k1Det_y = lambdify((y,k_1,k_2,k30,alpha),k1JointDetSol,'numpy')
+k2Det_y = lambdify((y,k_1,k_2,k30,alpha),k2JointDetSol,'numpy')
+plt.plot(k2Det_y(y_range, k_1_value,k_2_value,k3_value,alpha_value), k1Det_y(y_range, k_1_value,k_2_value,k3_value,alpha_value),color='r',linestyle='--', linewidth=1.5, label='multiplicity line')
+# plt.plot(k2Det_y(y_range, k_1_value,k_2_value,k3_value,alpha_value), k1Det_y(y_range, k_1_value,k_2_value,k3_value,alpha_value),linewidth=.8, label='multiplicity')
+plt.legend()
+plt.grid(True)
+plt.xlabel('$k_2$')
+plt.ylabel('$k_1$')
+plt.xlim([-0.0, 0.2])
+plt.ylim([-0.0, 0.2])
+plt.show()
+# #
+# #
+# # plt.plot(k2Trace_y(Y, km1val,km2val,k3_0val,alphaval), k1Trace_y(Y, km1val,km2val,k3_0val,alphaval),linestyle='--', linewidth=1.5, label='neutral')
+# # plt.plot(k2Det_of_y(Y, km1val,km2val,k3_0val,alphaval), k1Det_of_y(Y, km1val,km2val,k3_0val,alphaval),
+# # linewidth=.8, label='multiplicity')
+# # plt.xlabel(r'$k_1$')
+# # plt.ylabel(r'$k_2$')
+# # plt.xlim([-0.0, 0.2])
+# # plt.ylim([-0.0, 0.2])
+# # plt.legend(loc=0)
+# # plt.show()
+# # plt.title('Two-parameter analysis ($k_1(k_2)$)')
+# # # # plt.text(1.25, 0.2, '$I$', color='c')
+# # # # plt.text(1.0, 0.5, '$II$', color='c')
+# # # # plt.text(0.75, 0.8, '$III$', color='c')
+# # # # plt.text(1.0, 0.5, '$II$', color='c')
+# # # # plt.text(1.0, 0.7, '$sn_2$', color='g')
+# # # # plt.text(1.0, 0.5, '$II$', color='c')
+# # # # plt.text(1.15, 0.435, '$sn_1$', color='g')
+# # # # plt.text(0.75, 0.8, '$III$', color='c')
+# # plt.xlabel('$k_2$')
+# # plt.ylabel('$k_1$')
+# # plt.legend()
+
 
 ###############################################################################
-k_1_value=0.2
-k_2_value=0.8
+# k1_value=0.2
+# k2_value=0.8
 ###
-k2_value=0.03809116
-k_1_value=1.07475379e-01
+# k2_value=0.03809116
+# k1_value=1.07475379e-01
 
+# k2_value=0.020
+# k1_value=0.012
+
+# k2_value=0.05
+# k1_value=0.075
 
 f1 = lambdify((x, y, k1, k_1, k30, alpha), eq1)
 f2 = lambdify((x, y, k2, k_2, k30, alpha), eq2)
@@ -249,9 +306,9 @@ plt.title('Phase portrait')
 plt.show()
 
 
-print "k2_points=",k2_points
-PhasePortrait(k2_points[0])
-PhasePortrait(k2_points[1])
+# print "k2_points=",k2_points
+# PhasePortrait(k2_points[0])
+# PhasePortrait(k2_points[1])
 #
 # print "HERE"
 # res2 = solve([eq1, eq2], k1, x)
