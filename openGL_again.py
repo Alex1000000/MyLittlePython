@@ -4,9 +4,30 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from random import random
 import numpy as np
+import random
+import pywavefront
 
 from OpenGL.raw.GLU import gluLookAt
 
+class ObjParser2(object):
+    def __init__(self):
+        self.vertices = []
+        self.indices = []
+
+    def read_file(self, file_name):
+        for line in open(file_name, 'r'):
+            self.parse(line)
+
+    def parse(self, line):
+        entries = line.split()
+        if entries[0] == "v":
+            self.vertices += list(map(float, entries[1:4]))
+        elif entries[0] == "f":
+            quad = list(map(int, map(lambda s: s.split('/')[0], entries[1:])))
+            if len(quad) == 3:
+                self.indices += [quad[0]-1, quad[1]-1, quad[2]-1]
+            elif len(quad) == 4:
+                self.indices += [quad[0]-1, quad[1]-1, quad[2]-1, quad[2]-1, quad[3]-1, quad[0]-1]
 
 def create_shader(shader_type, source):
     shader = glCreateShader(shader_type)
@@ -36,7 +57,7 @@ def draw():
     # glDisableClientState(GL_COLOR_ARRAY)
     # glDisableClientState(GL_NORMAL_ARRAY)
     # glDisableClientState(GL_VERTEX_ARRAY)
-    glDrawArrays(GL_TRIANGLES, 0,2196)
+    glDrawArrays(GL_TRIANGLES, 0,50580)#10262)#2196)
     # glLoadIdentity()
     glDisableClientState(GL_VERTEX_ARRAY)
     glDisableClientState(GL_COLOR_ARRAY)
@@ -71,11 +92,7 @@ def draw():
     #     # pointdata.append([x,y,0])
     #     pointcolor.append([1,0,0])
     # # glEnd()
-    # # parser = ObjParser()
-    # # parser.read_file(file_name)
-    # # self.vertices = np.array(parser.vertices, dtype='f')
-    # # self.indices = np.array(parser.indices, dtype='i')
-    # # self.colors = np.array([random.random() for _ in parser.vertices], dtype='f')
+
     glutSwapBuffers()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
     pass
@@ -284,6 +301,7 @@ if __name__ == '__main__':
         pointcolor.append([1.0, 0.0, 0.0])
         pointdata = np.concatenate((pointdata, [[math.cos(((i + step) * math.pi) / 180), math.sin(((i + step) * math.pi) / 180), 0]]))
     # glEnd()
+    endOfCon=len(pointdata)
     for i in range(36,len(pointdata)):
         # print(pointdata[i])
         pointdata[i] = np.asarray(pointdata[i]) / size_con
@@ -292,6 +310,60 @@ if __name__ == '__main__':
         # print(pointdata[i])
         pointdata[i] = [pointdata[i][0],pointdata[i][1],pointdata[i][2]-1/4]
 
+
+
+    parser = ObjParser2()
+    parser.read_file("deer.obj")
+    vertices = np.array(parser.vertices, dtype='f')
+    indices = np.array(parser.indices, dtype='i')
+    colors = np.array([random.random() for _ in indices], dtype='f')
+    vertexRe= np.reshape(vertices, (len(vertices)/3, 3))
+    colorsRe=np.reshape(colors, (len(colors)/3, 3))
+    print("len(vertices)=", len(vertices))
+    print ("vertices=", vertices)
+    print("len(vertices)=", len(vertexRe))
+    print ("vertices=", vertexRe)
+    print("len(indices)=", len(indices))
+    print("indices=",indices)
+    newPointFromObj = []
+    for i in range(0,len(indices)):
+        # print(i)
+        # x = int(indices[i])
+        # print("x=",x)
+        elem= vertices[indices[i]]
+        # print("elem=", elem)
+        newPointFromObj.append(elem)
+    vertexRe2 = np.reshape(newPointFromObj, (len(newPointFromObj) / 3, 3))
+    print("len(vertexRe2)=", len(vertexRe2))
+    print("vertexRe2=",vertexRe2)
+
+    name = 'earth.obj'
+    meshes = pywavefront.Wavefront(name)
+    ps = pywavefront.ObjParser(meshes, name)
+    ps.read_file(name)
+    pointdata2 = ps.material.vertices
+    N = len(pointdata2) // 24
+    pointdata_earth = np.zeros((N, 3, 3))
+    pointcolor_earth = np.zeros((N * 3, 3))
+    pointcolor_earth+=1
+    for i in range(0, N):
+        for j in range(0, 3):
+            pointdata_earth[i, j, 0:3] = pointdata2[24 * i + 8 * j + 5:24 * i + 8 * j + 8]
+    pointdata_earth /= pointdata_earth.max()
+    pointdata_earth_new = np.zeros((N * 3, 3))
+    pointdata_earth_new = np.reshape(pointdata_earth, (N * 3, 3))
+
+    # for i in range(0, N):
+    pointcolor_earth[:, :] = [0.0, 0.0, 1.0]
+        # pointcolor_earth[3 * i + 1, :] = [0.0, 0.0, 1.0]
+        # pointcolor_earth[3 * i + 2, :] = [0.0, 0.0, 1.0]
+
+    pointdata = np.concatenate((pointdata, pointdata_earth_new))
+    pointcolor=np.concatenate((pointcolor, pointcolor_earth))
+
+    for i in range(endOfCon,len(pointdata)):
+        # print(pointdata[i])
+        pointdata[i] = np.asarray(pointdata[i]) / 10 -1/4
 
 
     # glTranslatef(0.0, 0.0, 0)                                # Сдвинемся по оси Z на -0.7
