@@ -3,6 +3,11 @@ from tkinter import ttk
 from tkinter import Text, END, INSERT,CURRENT,SEL_FIRST
 from tkinter.colorchooser import *
 from tkinter import filedialog
+import multiprocessing as mp
+import threading
+import multiprocessing
+from multiprocessing import Process, Lock, freeze_support
+import time
 
 import xml.etree.ElementTree as ET
 import matplotlib
@@ -166,7 +171,6 @@ def file_open():
 
 
 
-
 def acc_get(m, coordOfplanets):
     G = 6.67408 * (10 ** -11);
     numbOfPlanets = coordOfplanets.size // m.size
@@ -179,6 +183,42 @@ def acc_get(m, coordOfplanets):
                 dist=np.linalg.norm(rDiff)
                 acc[i * numbOfPlanets:(i + 1) * numbOfPlanets] += G * m[j] * rDiff / (dist ** 3)
     return acc
+
+def acceleration(body, masses, positions):
+    G = 6.67408 * (10 ** -11);
+    dimension = positions.size // masses.size
+
+    res = np.zeros(dimension)
+    for j in range(masses.size):
+        if body != j:
+            displacement = positions[j*dimension:(j+1) * dimension] - positions[body*dimension:(body+1)*dimension]
+            res += G*masses[j] * displacement / np.linalg.norm(displacement, 2)**3
+    return res
+
+def acceleration_no_np(body, masses, positions):
+    G = 6.67408 * (10 ** -11);
+    dimension = len(positions) // len(masses)
+
+    res = np.zeros(dimension)
+    displacement = np.empty(dimension)
+    for j in range(masses.size):
+        if body != j:
+            for k in range(dimension):
+                displacement[k] = positions[j * dimension + k] - positions[body * dimension + k]
+            res += G * masses[j] * displacement / np.linalg.norm(displacement, 2)**3
+    return res
+
+def acc_get_oneT(body, masses, positions):
+    G = 6.67408 * (10 ** -11);
+    dimension = positions.size // masses.size
+
+    res = np.zeros(dimension)
+    for j in range(masses.size):
+        if body != j:
+            displacement = positions[j*dimension:(j+1) * dimension] - positions[body*dimension:(body+1)*dimension]
+            res += G*masses[j] * displacement / np.linalg.norm(displacement, 2)**3
+    return res
+
 
 def scipy_n_body():
     def f_vect_scipy(z, t):
@@ -197,18 +237,51 @@ def scipy_n_body():
     tspan = np.arange(n) * T
     z_trajectories = odeint(f_vect_scipy, np.concatenate((ip, iv)), tspan)
 
-    # extracting the trajectories
-    x1_traj = z_trajectories[:, 0];
-    y1_traj = z_trajectories[:, 1];
-    x2_traj = z_trajectories[:, 2];
-    y2_traj = z_trajectories[:, 3];
-    x3_traj = z_trajectories[:, 4];
-    y3_traj = z_trajectories[:, 5];
+    # PrintOrbit
+
+
     a.cla()
-    a.plot(x1_traj, y1_traj,"r", x2_traj, y2_traj,"g", x3_traj, y3_traj,"b")
-    canvas.draw()
-    print(x1_traj)
-    plt.show()
+    a.set_ylim([-(1.5e11),1.5e11])
+    a.set_xlim([-(1.5e11),1.5e11])
+    for i in range(int(n)):
+        x1_traj = z_trajectories[i, 0];
+        y1_traj = z_trajectories[i, 1];
+        circle1 = plt.Circle((x1_traj, y1_traj), 0.1e11, color='r')
+        a.add_artist(circle1)
+
+        x1_traj = z_trajectories[i, 4];
+        y1_traj = z_trajectories[i, 5];
+        circle1 = plt.Circle((x1_traj, y1_traj), 0.01e11, color='b')
+        a.add_artist(circle1)
+
+        x1_traj = z_trajectories[i, 2];
+        y1_traj = z_trajectories[i, 3];
+        circle1 = plt.Circle((x1_traj, y1_traj), 0.01e11, color='y')
+        a.add_artist(circle1)
+        canvas.draw()
+        # for j in range(0,len(m)):
+        #     x1_traj = z_trajectories[i, j];
+        #     y1_traj = z_trajectories[i, j+1];
+        #     circle1 = plt.Circle((x1_traj, y1_traj), 0.01e11, color='b')
+        #     a.add_artist(circle1)
+        #     canvas.draw()
+        import time
+        # print(time)
+        time.sleep(0.01)
+        a.cla()
+
+    # # extracting the trajectories
+    # x1_traj = z_trajectories[:, 0];
+    # y1_traj = z_trajectories[:, 1];
+    # x2_traj = z_trajectories[:, 2];
+    # y2_traj = z_trajectories[:, 3];
+    # x3_traj = z_trajectories[:, 4];
+    # y3_traj = z_trajectories[:, 5];
+    # a.cla()
+    # a.plot(x1_traj, y1_traj,"r", x2_traj, y2_traj,"g", x3_traj, y3_traj,"b")
+    # canvas.draw()
+    # # print(x1_traj)
+    # plt.show()
 
 
 
@@ -248,9 +321,550 @@ def verlet_nBody():
     a.cla()
     a.plot(x1_traj, y1_traj,"r", x2_traj, y2_traj,"g", x3_traj, y3_traj,"b")
     canvas.draw()
+    # print(x1_traj)
+    plt.show()
+    # z = verlet(initz, T, n)
+    return
+
+
+def acc_getOne(m, coordOfplanets, jPlanet):
+    G = 6.67408 * (10 ** -11);
+    numbOfPlanets = coordOfplanets.size // m.size
+    acc = np.asarray([0.0,0.0])
+
+
+    acc = np.zeros(2)
+
+    i=0
+    for j in range(m.size):
+        if jPlanet != j:
+            rDiff = coordOfplanets[j * numbOfPlanets:(j + 1) * numbOfPlanets] - coordOfplanets[
+                                                                                i * numbOfPlanets:(
+                                                                                                  i + 1) * numbOfPlanets]
+            dist = np.linalg.norm(rDiff)
+            acc[i * numbOfPlanets:(i + 1) * numbOfPlanets] += G * m[j] * rDiff / (dist ** 3)
+    return acc
+
+
+def verlet_nBody_OneT(coordinatesAndVel, m, numberOfPlanets, jPlanet, n_iter, delta_t):
+    acc = acc_getOne(m, coordinatesAndVel[0, : numberOfPlanets], jPlanet)
+    for j in np.arange(n_iter - 1) + 1:
+        coordinatesAndVel[j, jPlanet] = coordinatesAndVel[j - 1, jPlanet] + coordinatesAndVel[j - 1, (jPlanet+numberOfPlanets)] * delta_t + 0.5 * acc[0:2] * (delta_t ** 2)
+        acc_next = acc_getOne(m, coordinatesAndVel[j, jPlanet], jPlanet)
+        coordinatesAndVel[j, jPlanet+numberOfPlanets] = coordinatesAndVel[j - 1, jPlanet+numberOfPlanets] + 0.5 * (acc + acc_next) * delta_t
+        acc = acc_next
+    return
+
+
+# def solveNbodiesVerletThreading(masses, init_pos, init_vel, dt, iterations):
+#
+#
+#     return posvel, times
+#
+
+def verlet_nBody_treading():
+    print("Treading function ")
+
+
+    delta_t =60 * 60 * 24
+    n = 365 * 1
+
+    G = 6.67408 * (10 ** -11);
+
+    m = np.array([ 1.98892e30, 7.34767309e22,5.972e24])# the sun  the moon the earth
+    ip = np.array([0, 0,  (1.496e11 + 3.84467e8), 0, 1.496e11, 0,])
+    iv = np.array([0, 0,   0,(2.9783e4 + 1022),        0, 2.9783e4])
+
+    times = np.arange(n) * delta_t
+    numberOfPlanets = ip.size
+
+    coordinatesAndVel = np.empty((times.size, numberOfPlanets * 2))
+    coordinatesAndVel[0] = np.concatenate((ip, iv))
+
+    tspan = np.arange(n) * delta_t
+    numberOfPlanets = ip.size
+
+    # coordinatesAndVel = np.empty((tspan.size, numberOfPlanets * 2))
+    # coordinatesAndVel[0] = np.concatenate((ip, iv))
+    dt=delta_t
+    print("Tread starting")
+    times = np.arange(n) * dt
+    half = ip.size
+    dimension = len(ip) // len(m)
+
+    # posvel = np.empty((times.size, half * 2))
+    # posvel[0] = np.concatenate((ip, iv))
+    def ThreadingWork(M, N, list_of_thread, th_ev):
+        for i in range(1, m):
+            for elem in list_of_thread:
+                elem.wait()
+                elem.clear()
+            th_ev.set()
+            for elem in list_of_thread:
+                elem.wait()
+                elem.clear()
+            th_ev.set()
+
+    def solveForOneBodyT(events, row_body,  treadId,  list_of_thread, th_ev):
+        # body, event_wait, event_set
+        for body in row_body:
+            # event_wait=events[body-1]
+            # event_set=events[body]
+            cur_acceleration = acceleration(body, m, coordinatesAndVel[0, :half])
+            for j in np.arange(n - 1) + 1:
+                print(j,"-",treadId)
+                list_of_thread[body].set()
+                th_ev.wait()
+                th_ev.clear()
+                coordinatesAndVel[j, body * dimension:(body + 1) * dimension] = \
+                    (coordinatesAndVel[j - 1, body * dimension:(body + 1) * dimension]
+                    + coordinatesAndVel[j - 1, half + body * dimension:half + (body + 1) * dimension] * dt
+                    + 0.5 * cur_acceleration * dt ** 2)
+
+                next_acceleration = acceleration(body, m, coordinatesAndVel[j, :half])
+                coordinatesAndVel[j, half + body * dimension:half + (body + 1) * dimension] = \
+                    (coordinatesAndVel[j - 1, half + body * dimension:half + (body + 1) * dimension]
+                    + 0.5 * (cur_acceleration + next_acceleration) * dt)
+                cur_acceleration = next_acceleration
+                list_of_thread[body].set()
+                th_ev.wait()
+                th_ev.clear()
+
+        return
+
+    def solveForOneBody(events,row_body,event_wait, event_set, treadId, treadsWait, treadsSet):
+        # body, event_wait, event_set
+        for body in row_body:
+            # event_wait=events[body-1]
+            # event_set=events[body]
+            cur_acceleration = acceleration(body, m, coordinatesAndVel[0, :half])
+            for j in np.arange(n - 1) + 1:
+                for id in range(0,len(events)):
+                    if id != treadId:
+                        print(treadId," wait for ",id )
+                        eventsWait[id].wait()
+                        eventsWait[id].wait()
+                        print(treadId," has waited for ",id )
+                events[treadId].clear()
+                        # event_wait.wait()
+                        # event_wait.clear()
+                coordinatesAndVel[j, body * dimension:(body + 1) * dimension] = \
+                    (coordinatesAndVel[j - 1, body * dimension:(body + 1) * dimension]
+                    + coordinatesAndVel[j - 1, half + body * dimension:half + (body + 1) * dimension] * dt
+                    + 0.5 * cur_acceleration * dt ** 2)
+                next_acceleration = acceleration(body, m, coordinatesAndVel[j, :half])
+                coordinatesAndVel[j, half + body * dimension:half + (body + 1) * dimension] = \
+                    (coordinatesAndVel[j - 1, half + body * dimension:half + (body + 1) * dimension]
+                    + 0.5 * (cur_acceleration + next_acceleration) * dt)
+                cur_acceleration = next_acceleration
+                # event_set.set()
+                events[treadId].set()
+                for id in range(0,len(events)):
+                    if id != treadId:
+                        # print(treadId," wait for ",id )
+                        events[id].clear()
+                print(treadId, " has been set ")
+        return
+
+    number_of_cpus = mp.cpu_count()
+    n_body_for1procc = int(np.ceil((len(m)) / number_of_cpus))
+
+
+    events = []
+    for i in range(0, number_of_cpus):
+        if (n_body_for1procc + i * n_body_for1procc) <= len(m):
+            events.append(threading.Event())
+            events[-1].clear()
+            events[-1].set()
+        elif (n_body_for1procc + (i - 1) * n_body_for1procc) < len(m):
+            events.append(threading.Event())
+            events[-1].clear()
+            events[-1].set()
+
+    eventsWait = []
+    for i in range(0, number_of_cpus):
+        if (n_body_for1procc + i * n_body_for1procc) <= len(m):
+            eventsWait.append(threading.Event())
+            eventsWait[-1].clear()
+            eventsWait[-1].set()
+        elif (n_body_for1procc + (i - 1) * n_body_for1procc) < len(m):
+            eventsWait.append(threading.Event())
+            eventsWait[-1].clear()
+            eventsWait[-1].set()
+    eventsSet = []
+    for i in range(0, number_of_cpus):
+        if (n_body_for1procc + i * n_body_for1procc) <= len(m):
+            eventsSet.append(threading.Event())
+            eventsSet[-1].clear()
+            # eventsSet[-1].set()
+        elif (n_body_for1procc + (i - 1) * n_body_for1procc) < len(m):
+            eventsSet.append(threading.Event())
+            eventsSet[-1].clear()
+            # eventsSet[-1].set()
+    list_of_thread=[]
+    th_ev = threading.Event()
+    for j in range(0, n):
+        th = threading.Event()
+        list_of_thread.append(th)
+        Threads = threading.Thread(target=ThreadingWork, name="ThreadingWork",
+                                   args=(len(m), n, list_of_thread, th_ev))
+    Threads.start()
+
+    # for i in range(0, number_of_cpus):
+    #     if (n_body_for1procc + i * n_body_for1procc) <= len(m):
+    #         th = threading.Event()
+    #         list_of_thread.append(th)
+    #     elif (n_body_for1procc + (i - 1) * n_body_for1procc) < len(m):
+    #         th = threading.Event()
+    #         list_of_thread.append(th)
+    # Threads = threading.Thread(target=ThreadingWork, name="ThreadingWork", args=(len(list_of_thread), n, list_of_thread, th_ev))
+    # Threads.start()
+
+    print("len(events)=",len(events))
+    threads = []
+    for i in range(0, number_of_cpus):
+        if (n_body_for1procc + i * n_body_for1procc) <= len(m):
+            row = np.arange(n_body_for1procc) + i * n_body_for1procc;
+            # e_set=events[i]
+            # e_wait=events[i-1]
+            # threads.append(threading.Thread(target=solveForOneBody, args=(events,row, e_wait,e_set,i, eventsWait, eventsSet)))
+            # threads[-1].start()
+            t=  threading.Thread(target=solveForOneBodyT, args=(events, row,  i,  list_of_thread, th_ev))
+            t.start()
+        elif (n_body_for1procc + (i - 1) * n_body_for1procc) < len(m):
+            # e_set = events[i]
+            # e_wait = events[i - 1]
+            row = np.arange(n_body_for1procc + (i - 1) * n_body_for1procc, len(m))
+            # threads.append(threading.Thread(target=solveForOneBody, args=(events,row, e_wait, e_set, i, eventsWait, eventsSet)))
+            # threads[-1].start()
+            t=  threading.Thread(target=solveForOneBodyT, args=(events, row,  i,  list_of_thread, th_ev))
+            t.start()
+    Threads.join()
+
+    # for thread in threads:
+    #     thread.join()
+    print("Tread ending")
+
+    # tspan = sp.linspace(0, T, n + 1)
+
+    x1_traj = coordinatesAndVel[:, 0];
+    y1_traj = coordinatesAndVel[:, 1];
+    x2_traj = coordinatesAndVel[:, 2];
+    y2_traj = coordinatesAndVel[:, 3];
+    x3_traj = coordinatesAndVel[:, 4];
+    y3_traj = coordinatesAndVel[:, 5];
+    a.cla()
+    a.plot(x1_traj, y1_traj,"r", x2_traj, y2_traj,"g", x3_traj, y3_traj,"b")
+    canvas.draw()
     print(x1_traj)
     plt.show()
     # z = verlet(initz, T, n)
+    return
+
+
+def verlet_nBody_treading2():
+    print("Treading function 4 treads 2")
+
+
+    delta_t =60 * 60 * 24
+    n = 365 * 1
+
+    G = 6.67408 * (10 ** -11);
+
+    m = np.array([ 1.98892e30, 7.34767309e22,5.972e24])# the sun  the moon the earth
+    ip = np.array([0, 0,  (1.496e11 + 3.84467e8), 0, 1.496e11, 0,])
+    iv = np.array([0, 0,   0,(2.9783e4 + 1022),        0, 2.9783e4])
+
+    times = np.arange(n) * delta_t
+    numberOfPlanets = ip.size
+
+    coordinatesAndVel = np.empty((times.size, numberOfPlanets * 2))
+    coordinatesAndVel[0] = np.concatenate((ip, iv))
+
+    tspan = np.arange(n) * delta_t
+    numberOfPlanets = ip.size
+
+    # coordinatesAndVel = np.empty((tspan.size, numberOfPlanets * 2))
+    # coordinatesAndVel[0] = np.concatenate((ip, iv))
+    dt=delta_t
+    print("Tread starting")
+    times = np.arange(n) * dt
+    half = ip.size
+    dimension = len(ip) // len(m)
+
+    times = np.arange(n) * dt
+    half = ip.size
+    dimension = len(ip) // len(m)
+
+    coordinatesAndVel = np.empty((times.size, half * 2))
+    coordinatesAndVel[0] = np.concatenate((ip, iv))
+
+    def solveForOneBody(row_body, event_wait, event_set):
+        for body in row_body:
+            cur_acceleration = acceleration(body, m, coordinatesAndVel[0, :half])
+            for j in np.arange(n - 1) + 1:
+                event_wait.wait()
+                event_wait.clear()
+                coordinatesAndVel[j, body*dimension:(body+1)*dimension] = \
+                (coordinatesAndVel[j-1, body*dimension:(body+1)*dimension]
+                 + coordinatesAndVel[j-1, half+body*dimension:half+(body+1)*dimension] * dt
+                 + 0.5 * cur_acceleration * dt**2)
+                next_acceleration = acceleration(body, m, coordinatesAndVel[j, :half])
+                coordinatesAndVel[j, half + body*dimension:half + (body+1)*dimension] = \
+                (coordinatesAndVel[j-1, half + body*dimension:half + (body+1)*dimension]
+                 + 0.5 * (cur_acceleration + next_acceleration) * dt)
+                cur_acceleration = next_acceleration
+                event_set.set()
+        return
+
+    events = []
+    for body in range(m.size):
+        events.append(threading.Event())
+        events[-1].clear()
+    events[0].set()
+
+    threads = []
+    number_of_cpus = mp.cpu_count()
+    n_body_for1procc = int(np.ceil((len(m)) / number_of_cpus))
+
+    for i in range(0, number_of_cpus):
+        if (n_body_for1procc + i * n_body_for1procc) <= len(m):
+            row = np.arange(n_body_for1procc) + i * n_body_for1procc;
+            e_set=events[i]
+            e_wait=events[i-1]
+            threads.append(threading.Thread(target=solveForOneBody, args=(row, e_wait, e_set)))
+            threads[-1].start()
+
+        elif (n_body_for1procc + (i - 1) * n_body_for1procc) < len(m):
+            e_set = events[i]
+            e_wait = events[i - 1]
+            row = np.arange(n_body_for1procc + (i - 1) * n_body_for1procc, len(m))
+            threads.append(threading.Thread(target=solveForOneBody, args=(row,  e_wait, e_set)))
+            threads[-1].start()
+
+
+    for thread in threads:
+        thread.join()
+
+    print("Tread ending")
+
+    # tspan = sp.linspace(0, T, n + 1)
+
+    x1_traj = coordinatesAndVel[:, 0];
+    y1_traj = coordinatesAndVel[:, 1];
+    x2_traj = coordinatesAndVel[:, 2];
+    y2_traj = coordinatesAndVel[:, 3];
+    x3_traj = coordinatesAndVel[:, 4];
+    y3_traj = coordinatesAndVel[:, 5];
+    a.cla()
+    a.plot(x1_traj, y1_traj,"r", x2_traj, y2_traj,"g", x3_traj, y3_traj,"b")
+    canvas.draw()
+    print(x1_traj)
+    plt.show()
+
+
+    return
+
+def solveForOneBodyM(q, q_out, init_vel, shared_pos, body_row, events1, events2,m,delta_t,n):
+    dimension = len(shared_pos) // len(m)
+    result_array=[]
+    for body in body_row:
+        my_cur_pos = np.array(shared_pos[body*dimension:(body+1)*dimension])
+        cur_acceleration = acceleration_no_np(body, m, shared_pos)
+
+        result = np.empty((n, dimension * 2))
+        result[0, :] = np.concatenate((my_cur_pos, init_vel[body*dimension:(body+1)*dimension]))
+
+        for j in np.arange(n - 1) + 1:
+            result[j, :dimension] = \
+                (my_cur_pos
+                 + result[j-1, dimension:] * delta_t
+                 + 0.5 * cur_acceleration * delta_t**2)
+
+            q.put([body, result[j, :dimension]])
+            events1[body].set()
+
+            if body == 0:
+                for i in range(len(m)):
+                    events1[i].wait()
+                    events1[i].clear()
+                for i in range(len(m)):
+                    tmp = q.get()
+                    shared_pos[tmp[0]*dimension:(tmp[0]+1)*dimension] = tmp[1]
+                for i in range(len(m)):
+                    events2[i].set()
+            else:
+                events2[body].wait()
+                events2[body].clear()
+
+            my_cur_pos = np.array(shared_pos[body * dimension:(body + 1) * dimension])
+            next_acceleration = acceleration_no_np(body, m, shared_pos)
+
+            result[j, dimension:] = \
+                (result[j-1, dimension:]
+                 + 0.5 * (cur_acceleration + next_acceleration) * delta_t)
+            cur_acceleration = next_acceleration
+            result_array.append([body, result])
+    q_out.put(result_array)
+    return
+
+
+
+
+def solveForOneBodyT( init_vel, shared_pos, body_row, events1, events2,m,delta_t,n):
+    dimension = len(shared_pos) // len(m)
+    result_array=[]
+    for body in body_row:
+        my_cur_pos = np.array(shared_pos[body*dimension:(body+1)*dimension])
+        cur_acceleration = acceleration_no_np(body, m, shared_pos)
+
+        result = np.empty((n, dimension * 2))
+        result[0, :] = np.concatenate((my_cur_pos, init_vel[body*dimension:(body+1)*dimension]))
+
+        for j in np.arange(n - 1) + 1:
+            result[j, :dimension] = \
+                (my_cur_pos
+                 + result[j-1, dimension:] * delta_t
+                 + 0.5 * cur_acceleration * delta_t**2)
+
+            # q.put([body, result[j, :dimension]])
+            events1[body].set()
+
+            if body == 0:
+                for i in range(len(m)):
+                    events1[i].wait()
+                    events1[i].clear()
+                for i in range(len(m)):
+                    # tmp = q.get()
+                    shared_pos[body*dimension:(body+1)*dimension] = result[j, :dimension]
+                for i in range(len(m)):
+                    events2[i].set()
+            else:
+                events2[body].wait()
+                events2[body].clear()
+
+            my_cur_pos = np.array(shared_pos[body * dimension:(body + 1) * dimension])
+            next_acceleration = acceleration_no_np(body, m, shared_pos)
+
+            result[j, dimension:] = \
+                (result[j-1, dimension:]
+                 + 0.5 * (cur_acceleration + next_acceleration) * delta_t)
+            cur_acceleration = next_acceleration
+            result_array.append([body, result])
+    # q_out.put(result_array)
+    return
+
+#
+# def solveNbodiesVerletMultiprocessing(masses, init_pos, init_vel, dt, iterations):
+#
+#         return posvel, times
+
+def verlet_nBody_multiprocessing():
+    number_of_cpus = mp.cpu_count()
+    print("mul proc start")
+    # Plots the trajectories of 3 equal masses
+    delta_t =60 * 60 * 24
+    n = 365 * 1
+
+    G = 6.67408 * (10 ** -11);
+
+    m = np.array([ 1.98892e30, 7.34767309e22,5.972e24])# the sun  the moon the earth
+    ip = np.array([0, 0,  (1.496e11 + 3.84467e8), 0, 1.496e11, 0,])
+    iv = np.array([0, 0,   0,(2.9783e4 + 1022),        0, 2.9783e4])
+
+    times = np.arange(n) * delta_t
+    numberOfPlanets = ip.size
+
+    coordinatesAndVel = np.empty((times.size, numberOfPlanets * 2))
+    coordinatesAndVel[0] = np.concatenate((ip, iv))
+    #
+
+
+    # if __name__ == '__main__':
+    times = np.arange(n) * delta_t
+
+    coordinatesAndVel = np.empty((times.size, ip.size * 2))
+    shared_pos = mp.Array('d', ip)
+
+    # n_rows_for_t = int(np.ceil((len(x)) / number_of_cpus))
+    # q_main = mp.Queue()
+    # ques = []
+    # for i in range(0, number_of_cpus):
+    #     if (n_rows_for_t + i * n_rows_for_t) <= len(x):
+    #         q = mp.Queue()
+    #         row = np.arange(n_rows_for_t) + i * n_rows_for_t;
+    #         p = mp.Process(target=colOneM, args=(z, row, x, y, q))
+    #         process.append(p)
+    #         ques.append(q)
+    #     else:
+    #         if (n_rows_for_t + (i - 1) * n_rows_for_t) <= len(x):
+    #             q = mp.Queue()
+    #             row = np.arange(n_rows_for_t + (i - 1) * n_rows_for_t, len(x))
+    #             p = mp.Process(target=colOneM, args=(z, row, x, y, q))
+    #             process.append(p)
+    #             ques.append(q)
+    # time_start = time.time()
+    # for pro in process:
+    #     pro.start()
+    # for pro in ques:
+    #     value_from_q = pro.get()
+    #     z[value_from_q[1], :] = value_from_q[0]
+
+    n_body_for1procc = int(np.ceil((len(m)) / number_of_cpus))
+
+    events1 = []
+    events2 = []
+    for i in range(0, number_of_cpus):
+        events1.append(mp.Event())
+        events2.append(mp.Event())
+        events1[len(events1)-1].clear()
+        events2[len(events1)-1].clear()
+
+    q = mp.Queue()
+    q_out = mp.Queue()
+    processes = []
+    print("n_body_for1procc=",n_body_for1procc)
+    for i in range(0, number_of_cpus):
+        if (n_body_for1procc + i * n_body_for1procc) <= len(m):
+            row = np.arange(n_body_for1procc) + i * n_body_for1procc;
+            # print("row", row)
+            p=mp.Process(target=solveForOneBodyM, args=(q, q_out, iv, shared_pos, row, events1, events2, m,delta_t,n))
+            processes.append(p)
+            p.start()
+        elif (n_body_for1procc + (i - 1) * n_body_for1procc) < len(m):
+            row = np.arange(n_body_for1procc + (i - 1) * n_body_for1procc, len(m))
+            # print("row_=", row)
+            p=mp.Process(target=solveForOneBodyM, args=(q, q_out, iv, shared_pos,row,  events1, events2, m,delta_t,n))
+            processes.append(p)
+            p.start()
+
+    dim = ip.size // len(m)
+    for i in processes:
+        resFromq = q_out.get()
+        # coordinatesAndVel[:, tmp[0]*dim:(tmp[0]+1)*dim] = tmp[1][:, :dim]
+        # coordinatesAndVel[:, ip.size + tmp[0]*dim: ip.size + (tmp[0]+1)*dim] = tmp[1][:, dim:]
+        # print("i=",i," temp=",tmp)
+        for tmp in resFromq:
+            coordinatesAndVel[:, tmp[0] * dim:(tmp[0] + 1) * dim] = tmp[1][:, :dim]
+            coordinatesAndVel[:, ip.size + tmp[0] * dim: ip.size + (tmp[0] + 1) * dim] = tmp[1][:, dim:]
+
+    for process in processes:
+        process.join()
+    #
+    #
+    x1_traj = coordinatesAndVel[:, 0];
+    y1_traj = coordinatesAndVel[:, 1];
+    x2_traj = coordinatesAndVel[:, 2];
+    y2_traj = coordinatesAndVel[:, 3];
+    x3_traj = coordinatesAndVel[:, 4];
+    y3_traj = coordinatesAndVel[:, 5];
+    a.cla()
+    a.plot(x1_traj, y1_traj,"r", x2_traj, y2_traj,"g", x3_traj, y3_traj,"b")
+    canvas.draw()
+    # print(x1_traj)
+    plt.show()
+    # z = verlet(initz, T, n)
+    print("mul proc end")
     return
 
 def n_body_solving():
@@ -262,124 +876,131 @@ def n_body_solving():
     elif (modeOfComputation=="2"):
         print("it's_verlet")
         verlet_nBody()
+    elif (modeOfComputation=="3"):
+        print("it's_verlet_treading")
+        # verlet_nBody_treading()
+        verlet_nBody_treading2()
+    elif (modeOfComputation=="4"):
+        print("it's_verlet_multiprocessing")
+        verlet_nBody_multiprocessing()
+
+
+if __name__ == '__main__':
+    x_mouse=0.0
+    y_mouse=0.0
+    win = tk.Tk()                           # Create instance
+    win.title("Python GUI")                 # Add a title
+    tabControl = ttk.Notebook(win)          # Create Tab Control
+    tab1 = ttk.Frame(tabControl, width= 70,height = 70)            # Create a tab
+    tabControl.add(tab1, text='Edit')      # Add the tab
+    tabControl.pack(expand=1, fill="both",side=tk.LEFT)  # Pack to make visible
+
+    mouse_label = tk.Label(tab1, text="Mouse coordinates:")
+    mouse_label.pack()
+
+    S = tk.Scrollbar(tab1)
+    S.pack(side=tk.RIGHT, fill=tk.Y)
+
+    e = tk.Entry(tab1)
+    e.pack()
+    # e.delete(0, END)
+    e.insert(0, "None;  None")
+
+    T = Text(tab1, height=2, width=30)
+    #T.pack()
+    T.insert(END, "Just a text Widget   ""HAMLET: To be, or not to be--that is the question:tis nobler in the mind to sufferThe slings and arrows of outrageous fortune")
+    S.config(command=T.yview)#######################
+    T.config(yscrollcommand=S.set)######################
+
+
+    slider_label = tk.Label(tab1, text="Slider value:")
+    slider_label.pack()
+    entrySlider = tk.Entry(tab1)
+    entrySlider.pack()
+    # e.delete(0, END)
+    entrySlider.insert(0, "1")
+    scaleMy=tk.Scale(tab1, from_=1.0, to=100.0, orient=tk.HORIZONTAL, command= sliderMove)
+    scaleMy.pack()
+
+    currentColorFromCombo=0
+    combo=ttk.Combobox(tab1)
+    combo['values']=('Red','Green','Blue', 'Yellow', 'Purple')
+    combo.set('Red')
+    combo.pack()
+    combo.bind("<<ComboboxSelected>>", getColorFromCombo)
 
 
 
-x_mouse=0.0
-y_mouse=0.0
-win = tk.Tk()                           # Create instance
-win.title("Python GUI")                 # Add a title
-tabControl = ttk.Notebook(win)          # Create Tab Control
-tab1 = ttk.Frame(tabControl, width= 70,height = 70)            # Create a tab
-tabControl.add(tab1, text='Edit')      # Add the tab
-tabControl.pack(expand=1, fill="both",side=tk.LEFT)  # Pack to make visible
-
-mouse_label = tk.Label(tab1, text="Mouse coordinates:")
-mouse_label.pack()
-
-S = tk.Scrollbar(tab1)
-S.pack(side=tk.RIGHT, fill=tk.Y)
-
-e = tk.Entry(tab1)
-e.pack()
-# e.delete(0, END)
-e.insert(0, "None;  None")
-
-T = Text(tab1, height=2, width=30)
-#T.pack()
-T.insert(END, "Just a text Widget   ""HAMLET: To be, or not to be--that is the question:tis nobler in the mind to sufferThe slings and arrows of outrageous fortune")
-S.config(command=T.yview)#######################
-T.config(yscrollcommand=S.set)######################
+    tab2 = ttk.Frame(tabControl, width=70,height =70)            # Create a tab
+    tabControl.add(tab2, text='Model')      # Add the tab
+    tabControl.pack(expand=1, fill="both")  # Pack to make visible
 
 
-slider_label = tk.Label(tab1, text="Slider value:")
-slider_label.pack()
-entrySlider = tk.Entry(tab1)
-entrySlider.pack()
-# e.delete(0, END)
-entrySlider.insert(0, "1")
-scaleMy=tk.Scale(tab1, from_=1.0, to=100.0, orient=tk.HORIZONTAL, command= sliderMove)
-scaleMy.pack()
+    currentCircleList= CircleParamsListToSave()
+    f = Figure(figsize=(4, 4), dpi=100)
+    a = f.add_subplot(111)
+    t = arange(-100.0, 100.0, 1.0)
+    s = np.exp(-t/2.) * np.sin(2*np.pi*t)#sin(2*pi*(t/100))
 
-currentColorFromCombo=0
-combo=ttk.Combobox(tab1)
-combo['values']=('Red','Green','Blue', 'Yellow', 'Purple')
-combo.set('Red')
-combo.pack()
-combo.bind("<<ComboboxSelected>>", getColorFromCombo)
+    #a.plot(t, s)
+    axis_size=100
+    a.set_ylim([-100,100])
+    a.set_xlim([-100,100])
 
+    # a tk.DrawingArea
+    canvas = FigureCanvasTkAgg(f, master=win)
+    canvas.show()
+    canvas.get_tk_widget().pack()
 
+    toolbar = NavigationToolbar2TkAgg(canvas, win)
+    toolbar.update()
+    canvas._tkcanvas.pack()
 
-tab2 = ttk.Frame(tabControl, width=70,height =70)            # Create a tab
-tabControl.add(tab2, text='Model')      # Add the tab
-tabControl.pack(expand=1, fill="both")  # Pack to make visible
+    # btn = tk.Button(win,  #родительское окно
+    #              text="Click me",  #надпись на кнопке
+    #              width=10, height=2,  #ширина и высота
+    #              bg="white", fg="black") #цвет фона и надписи
+    # btn.bind("<Button-1>", Hello)       #при нажатии ЛКМ на кнопку вызывается функция Hello
+    # btn.pack()                          #расположить кнопку на главном окне
 
-
-currentCircleList= CircleParamsListToSave()
-f = Figure(figsize=(4, 4), dpi=100)
-a = f.add_subplot(111)
-t = arange(-100.0, 100.0, 1.0)
-s = np.exp(-t/2.) * np.sin(2*np.pi*t)#sin(2*pi*(t/100))
-
-#a.plot(t, s)
-axis_size=100
-a.set_ylim([-100,100])
-a.set_xlim([-100,100])
-
-# a tk.DrawingArea
-canvas = FigureCanvasTkAgg(f, master=win)
-canvas.show()
-canvas.get_tk_widget().pack()
-
-toolbar = NavigationToolbar2TkAgg(canvas, win)
-toolbar.update()
-canvas._tkcanvas.pack()
-
-# btn = tk.Button(win,  #родительское окно
-#              text="Click me",  #надпись на кнопке
-#              width=10, height=2,  #ширина и высота
-#              bg="white", fg="black") #цвет фона и надписи
-# btn.bind("<Button-1>", Hello)       #при нажатии ЛКМ на кнопку вызывается функция Hello
-# btn.pack()                          #расположить кнопку на главном окне
-
-btn =tk.Button(master=win, text='+', bg="green",fg="white" ,command=IncreaseScale)
-btn.pack()
-btn =tk.Button(master=win, text='-', bg="red",fg="white" ,command=DecreaseScale)
-btn.pack()
-button = tk.Button(master=win, text='Quit', bg="blue",fg="white" ,command=_quit)
-button.pack(side=tk.BOTTOM)
-selectColor=tk.Button(tab2,text="selectColor", command=getColor)
-selectColor.pack()
-saveFile=tk.Button(tab1,text="saveFile", command=file_save)
-saveFile.pack()
-openFile=tk.Button(tab1,text="openFile", command=file_open)
-openFile.pack()
-# nBody=tk.Button(tab1,text="openFile", command=file_open)
-# nBody.pack()
+    btn =tk.Button(master=win, text='+', bg="green",fg="white" ,command=IncreaseScale)
+    btn.pack()
+    btn =tk.Button(master=win, text='-', bg="red",fg="white" ,command=DecreaseScale)
+    btn.pack()
+    button = tk.Button(master=win, text='Quit', bg="blue",fg="white" ,command=_quit)
+    button.pack(side=tk.BOTTOM)
+    selectColor=tk.Button(tab2,text="selectColor", command=getColor)
+    selectColor.pack()
+    saveFile=tk.Button(tab1,text="saveFile", command=file_save)
+    saveFile.pack()
+    openFile=tk.Button(tab1,text="openFile", command=file_open)
+    openFile.pack()
+    # nBody=tk.Button(tab1,text="openFile", command=file_open)
+    # nBody.pack()
 
 
-MODES = [
+    MODES = [
         ("scipy", "1"),
         ("verlet", "2"),
         ("verlet-threading", "3"),
         ("verlet-multiprocessing", "4"),
         ("verlet-cython", "5"),
         ("verlet-opencl", "6")
-    ]
+        ]
 
-v = tk.StringVar()
-v.set("1") # initialize
+    v = tk.StringVar()
+    v.set("1") # initialize
 
-for text, mode in MODES:
-    b = tk.Radiobutton(tab2, text=text,variable=v, value=mode, command=n_body_solving)
-    b.pack(anchor=tk.W)
+    for text, mode in MODES:
+        b = tk.Radiobutton(tab2, text=text,variable=v, value=mode, command=n_body_solving)
+        b.pack(anchor=tk.W)
 
-#ax = plt.axes()
-#ax.transData.transform_point([x, y])
-#inv = ax.transData.inverted()
-cid = f.canvas.mpl_connect('motion_notify_event', onMouseMove)
-# cid = f.canvas.mpl_connect('motion_notify_event', sliderMove)
-win.bind("<Button-1>", onMouseClick)
+    #ax = plt.axes()
+    #ax.transData.transform_point([x, y])
+    #inv = ax.transData.inverted()
+    cid = f.canvas.mpl_connect('motion_notify_event', onMouseMove)
+    # cid = f.canvas.mpl_connect('motion_notify_event', sliderMove)
+    win.bind("<Button-1>", onMouseClick)
 
 
-win.mainloop()
+    win.mainloop()
