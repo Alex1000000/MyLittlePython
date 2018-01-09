@@ -24,50 +24,69 @@ g_right = Expression('sin(2*pi*x[1]/3)', degree=1)
 
 
 # Define  boundary (x = 0 or x = 5)
-def boundary_left(x, on_boundary):
+def boundary_leftX(x, on_boundary):
     return on_boundary and near(x[0], 0, nearEr)
 
 
-def boundary_right(x, on_boundary):
+def boundary_rightX(x, on_boundary):
     return on_boundary and near(x[0], 5, nearEr)
 
 # Define  boundary (y = 0 or y = 3)
-class Bottom(SubDomain):
-    def inside(self, x, on_boundary):
-        return on_boundary and near(x[1], 0, nearEr)
+
+def boundary_leftY(x, on_boundary):
+    return on_boundary and near(x[1], 0, nearEr)
 
 
-class Top(SubDomain):
-    def inside(self, x, on_boundary):
-        return on_boundary and near(x[1], 3, nearEr)
+def boundary_rightY(x, on_boundary):
+    return on_boundary and near(x[1], 3, nearEr)	
+	
+	
 
-bc_left = DirichletBC(V, u_left, boundary_left)
-bc_right = DirichletBC(V, u_right, boundary_right)
-bcs = [bc_left, bc_right]
+#class Bottom(SubDomain):
+#    def inside(self, x, on_boundary):
+#        return on_boundary and near(x[1], 0, nearEr)
+
+
+#class Top(SubDomain):
+#    def inside(self, x, on_boundary):
+#        return on_boundary and near(x[1], 3, nearEr)
+
+#bc_left = DirichletBC(V, u_left, boundary_left)
+#bc_right = DirichletBC(V, u_right, boundary_right)
+
+bc_leftX = DirichletBC(V, g_left, boundary_leftX)
+bc_rightX = DirichletBC(V, g_right, boundary_rightX)
+
+bc_leftY = DirichletBC(V, u_left, boundary_leftY)
+bc_rightY = DirichletBC(V, u_right, boundary_rightY)
+
+bcs = [bc_leftX, bc_rightX, bc_leftY, bc_rightY]
 
 
 
-top = Top()
-bottom = Bottom()
-boundaries = FacetFunction("size_t", mesh)
-boundaries.set_all(0)
-top.mark(boundaries, 1)
-bottom.mark(boundaries, 2)
-ds = Measure('ds', domain=mesh, subdomain_data=boundaries)
+
+#top = Top()
+#bottom = Bottom()
+#boundaries = FacetFunction("size_t", mesh)
+#boundaries.set_all(0)
+#top.mark(boundaries, 1)
+#bottom.mark(boundaries, 2)
+#ds = Measure('ds', domain=mesh, subdomain_data=boundaries)
 
 
 # Define variational problem
-f = Expression("sin(pi*x[0])*sin(2*pi*x[1])", degree=1)
+f = Expression("-sin(pi*x[0])*sin(2*pi*x[1])", degree=1)
 u = TrialFunction(V)
 v = TestFunction(V)
 a = dot(grad(u), grad(v)) * dx
-L = f*v*dx - g_right * v * ds(1) - g_left * v * ds(2)
+L = f*v*dx 
 
 # Compute solution
 fem_solution = Function(V)
 solve(a == L, fem_solution, bcs)
 
-paper_solution = Expression('sin(pi*x[0])*sin(2*pi*x[1])+sinh(2*pi*x[0]/3)*sin(2*pi*x[1]/3)/sinh(10*pi/3)+sin(pi*x[1])*(cosh(pi*x[0])-cosh(pi*5)*sinh(pi*x[0])/sinh(pi*5))+sinh(3*pi*x[1]/5)*sin(3*pi*x[0]/5)/sinh(9*pi/5)+sin(pi*x[0]/5)*(cosh(pi*x[1]/5)-cosh(3*pi/5)*sinh(pi*x[1]/5)/sinh(3*pi/5))', degree=2)
+paper_solution = Expression('-sin(pi*x[0])*sin(2*pi*x[1])/(5*pi*pi)+sinh(2*pi*x[0]/3)*sin(2*pi*x[1]/3)/sinh(10*pi/3)+sin(pi*x[1])*(cosh(pi*x[0])-cosh(pi*5)*sinh(pi*x[0])/sinh(pi*5))+sinh(3*pi*x[1]/5)*sin(3*pi*x[0]/5)/sinh(9*pi/5)+sin(pi*x[0]/5)*(cosh(pi*x[1]/5)-cosh(3*pi/5)*sinh(pi*x[1]/5)/sinh(3*pi/5))', degree=2)
+
 error_L2 = errornorm(paper_solution, fem_solution, 'L2')
 vertex_values_fem = fem_solution.compute_vertex_values(mesh)
 vertex_values_paper = paper_solution.compute_vertex_values(mesh)
